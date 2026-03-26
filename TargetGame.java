@@ -1,31 +1,24 @@
 import java.awt.*;
 import java.awt.event.*;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.Random;
+import java.util.*;
 import javax.swing.*;
+import javax.swing.Timer;
 
 public class TargetGame extends JPanel implements MouseListener {
 
-    // 🎯 Target class
-    static class Target {
+    class Target {
         int x, y, size;
-        Color color;
+        Image image;
 
         Target(int x, int y, int size) {
             this.x = x;
             this.y = y;
             this.size = size;
-            this.color = new Color(
-                    (int)(Math.random() * 255),
-                    (int)(Math.random() * 255),
-                    (int)(Math.random() * 255)
-            );
+            this.image = new ImageIcon("images/target.png").getImage();
         }
 
         void draw(Graphics g) {
-            g.setColor(color);
-            g.fillOval(x, y, size, size);
+            g.drawImage(image, x, y, size, size, null);
         }
 
         boolean isHit(int mx, int my) {
@@ -34,18 +27,32 @@ public class TargetGame extends JPanel implements MouseListener {
         }
     }
 
+    class Explosion {
+        int x, y;
+        int life = 10;
+        Image img = new ImageIcon("images/explosion.png").getImage();
+
+        Explosion(int x, int y) {
+            this.x = x;
+            this.y = y;
+        }
+
+        void draw(Graphics g) {
+            g.drawImage(img, x - 25, y - 25, 60, 60, null);
+            life--;
+        }
+    }
+
     ArrayList<Target> targets = new ArrayList<>();
+    ArrayList<Explosion> explosions = new ArrayList<>();
+
     Random rand = new Random();
 
-    int score = 0;
-    int highScore = 0;
-    int time = 30;
+    int score = 0, highScore = 0, time = 30;
 
-    Timer gameTimer;
-    Timer spawnTimer;
+    Timer gameTimer, spawnTimer;
 
-    boolean gameStarted = false;
-    boolean gameOver = false;
+    boolean gameStarted = false, gameOver = false;
 
     JButton startButton;
 
@@ -56,30 +63,40 @@ public class TargetGame extends JPanel implements MouseListener {
 
         addMouseListener(this);
 
-        // Start Button
+        // 🔫 Custom Cursor
+        ImageIcon icon = new ImageIcon("images/crosshair.png");
+    Image img = icon.getImage().getScaledInstance(32, 32, Image.SCALE_SMOOTH);
+
+Cursor cursor = Toolkit.getDefaultToolkit().createCustomCursor(
+        img,
+        new Point(16, 16),
+        "Crosshair"
+);
+
+setCursor(cursor);
+
+        // Start button
         startButton = new JButton("Start Game");
         startButton.setBounds(220, 250, 150, 40);
         add(startButton);
 
         startButton.addActionListener(e -> startGame());
 
-        // Game Timer (1 sec)
+        // Timers
         gameTimer = new Timer(1000, e -> {
             time--;
-            if (time <= 0) {
-                endGame();
-            }
+            if (time <= 0) endGame();
             repaint();
         });
 
-        // Target Spawn Timer
-        spawnTimer = new Timer(1000, e -> spawnTarget());
+        spawnTimer = new Timer(800, e -> spawnTarget());
     }
 
     void startGame() {
         score = 0;
         time = 30;
         targets.clear();
+        explosions.clear();
 
         gameStarted = true;
         gameOver = false;
@@ -97,16 +114,14 @@ public class TargetGame extends JPanel implements MouseListener {
         gameTimer.stop();
         spawnTimer.stop();
 
-        if (score > highScore) {
-            highScore = score;
-        }
+        if (score > highScore) highScore = score;
 
         startButton.setText("Restart");
         startButton.setVisible(true);
     }
 
     void spawnTarget() {
-        int size = rand.nextInt(30) + 30;
+        int size = rand.nextInt(30) + 40;
         int x = rand.nextInt(600 - size);
         int y = rand.nextInt(600 - size);
 
@@ -130,6 +145,14 @@ public class TargetGame extends JPanel implements MouseListener {
         if (gameStarted) {
             for (Target t : targets) {
                 t.draw(g);
+            }
+
+            // draw explosions
+            Iterator<Explosion> it = explosions.iterator();
+            while (it.hasNext()) {
+                Explosion ex = it.next();
+                ex.draw(g);
+                if (ex.life <= 0) it.remove();
             }
 
             g.setColor(Color.WHITE);
@@ -160,20 +183,18 @@ public class TargetGame extends JPanel implements MouseListener {
             Target t = iterator.next();
             if (t.isHit(mx, my)) {
                 score += 10;
+                explosions.add(new Explosion(mx, my)); // 💥 effect
                 iterator.remove();
                 hit = true;
                 break;
             }
         }
 
-        if (!hit) {
-            score -= 5;
-        }
+        if (!hit) score -= 5;
 
         repaint();
     }
 
-    // unused methods
     public void mousePressed(MouseEvent e) {}
     public void mouseReleased(MouseEvent e) {}
     public void mouseEntered(MouseEvent e) {}
